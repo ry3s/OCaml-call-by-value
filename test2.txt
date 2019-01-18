@@ -1,0 +1,4 @@
+let l2 = [(5,true);(1,false);(6,true)];;
+match l2 with
+ l -> let a::(c,d)::rest = l in c
+| (i,b)::rest -> if b then i else 0 end;;
