@@ -1,7 +1,7 @@
-SOURCES = syntax.ml type.ml eval.ml print.ml myLexer.mll myParser.mly myOCaml.ml
-RESULT  = myOCaml
+SOURCES = syntax.ml type.ml eval.ml print.ml lexer.mll parser.mly main.ml
+RESULT  = main
 
-YFLAGS = -v 
+YFLAGS = -v
 
 all: byte-code byte-code-library
 

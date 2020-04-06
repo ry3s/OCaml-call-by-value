@@ -1,11 +1,11 @@
 {
-  open MyParser
+  open Parser
 }
 let digit = ['0'-'9']
 let bool = "true" | "false"
 let space = ' ' | '\t' | '\r' | '\n'
-let alpha = ['a'-'z' 'A'-'Z' '_' ] 
-let ident = alpha (alpha | digit)* 
+let alpha = ['a'-'z' 'A'-'Z' '_' ]
+let ident = alpha (alpha | digit)*
 
 rule token = parse
 | space+      { token lexbuf }
@@ -23,7 +23,7 @@ rule token = parse
 | "]"         { RBRA }
 | ";"         { SEMI }
 | ","         { COMMA }
-| "::"        { CONS } 
+| "::"        { CONS }
 | "if"        { IF   }
 | "then"      { THEN }
 | "else"      { ELSE }
