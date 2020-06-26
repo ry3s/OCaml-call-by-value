@@ -5,7 +5,7 @@ open Eval
 open Print
 open Type
 
-let myml in_chan =
+let repl in_chan =
   let lexbuf = Lexing.from_channel in_chan in
   let rec repl env tenv =
     try
@@ -29,13 +29,11 @@ let myml in_chan =
   repl [] []
 
 let main () = if Array.length Sys.argv = 1 then
-                myml stdin
+                repl stdin
               else
                 let ic = open_in Sys.argv.(1) in
-                myml ic
+                repl ic
 
 
-let () = if !Sys.interactive then
-           ()
-         else
-           main ()
+let _ = if !Sys.interactive then ()
+         else main ()
