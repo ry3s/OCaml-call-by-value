@@ -39,23 +39,25 @@ let rec find_match : pattern -> value -> env option = fun pattern value ->
   | _ -> None
   end
 
+let eval_bin_op : bin_op -> value-> value -> value = fun op e1 e2 ->
+  match (op, e1, e2) with
+  | (OpAdd, VInt x1, VInt x2) -> VInt (x1 + x2)
+  | (OpSub, VInt x1, VInt x2) -> VInt (x1 - x2)
+  | (OpMul, VInt x1, VInt x2) -> VInt (x1 * x2)
+  | (OpDiv, VInt x1, VInt x2) -> VInt (x1 / x2)
+  | (OpEq , VInt x1, VInt x2) -> VBool (x1 = x2)
+  | (OpLt , VInt x1, VInt x2) -> VBool (x1 < x2)
+  | (OpEq , VBool b1, VBool b2) -> VBool (b1 = b2)
+  | (OpLt , VBool b1, VBool b2) -> VBool (b1 < b2)
+  | _ -> raise (Eval_error __LOC__)
+
 let rec eval : env -> expr -> value = fun env ->
   function
   | EValue v -> v
   | EVar x -> List.assoc x env
   | EBin (op, e1, e2) ->
      let (e1', e2') = (eval env e1, eval env e2) in
-     begin match (op, e1', e2') with
-     | (OpAdd, VInt x1, VInt x2) -> VInt (x1 + x2)
-     | (OpSub, VInt x1, VInt x2) -> VInt (x1 - x2)
-     | (OpMul, VInt x1, VInt x2) -> VInt (x1 * x2)
-     | (OpDiv, VInt x1, VInt x2) -> VInt (x1 / x2)
-     | (OpEq , VInt x1, VInt x2) -> VBool (x1 = x2)
-     | (OpLt , VInt x1, VInt x2) -> VBool (x1 < x2)
-     | (OpEq , VBool b1, VBool b2) -> VBool (b1 = b2)
-     | (OpLt , VBool b1, VBool b2) -> VBool (b1 < b2)
-     | _ -> raise (Eval_error __LOC__)
-     end
+     eval_bin_op op e1' e2'
   | ETuple es -> VTuple (List.map (fun x -> eval env x) es)
   | ENil -> VNil
   | ECons (e1, e2) -> let v1 = eval env e1 in
@@ -123,11 +125,11 @@ let execute_cmd : env -> command  -> env * value =
      | None -> raise (Eval_error __LOC__)
      end
   | CRLet (f, x, e) -> ((f, VRFun (f, x, e, env))::env, VRFun (f, x, e, env))
-  | CMRLet funlist ->
-     let rec iter = fun n -> function
-                          | ((f, x, e) :: xs) -> (f, VMRFun (n, funlist, env)) :: (iter (n + 1) xs)
-                          | [] -> []
+  | CMRLet fs ->
+     let env' = List.mapi (fun i (f, x, e) ->
+                    (f, VMRFun (i + 1, fs, env))
+                  ) fs
      in
-     let newenv =  (iter 1 funlist) @ env in
-     (newenv, VMRFun (1, funlist, env))
+     let newenv =  env' @ env in
+     (newenv, VMRFun (1, fs, env))
   | CEnd -> raise End;;
