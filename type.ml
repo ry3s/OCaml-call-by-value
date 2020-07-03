@@ -1,16 +1,16 @@
 (* FIX: let rec f x = f x and f x = f x;; *)
 (* FIX: match x with (y, y) -> ~ *)
 (* TODO: let polymorphism *)
-open Syntax 
+open Syntax
 exception Type_error of string
 exception End
-type tvar = int 
+type tvar = int
 type ty =
   | TInt
   | TBool
   | TFun of ty * ty
   | TList of ty
-  | TTuple of ty list 
+  | TTuple of ty list
   | TVar of tvar
 type ty_subst =  (tvar * ty) list
 type ty_constraints = (ty * ty) list
@@ -42,7 +42,7 @@ let compose_ty_subst : ty_subst -> ty_subst -> ty_subst =
   tysub1' @ tysub2'
 ;;
 (* t2の中にt1と同じ型変数があればtrueを返す *)
-let rec ty_find :ty -> ty -> bool =
+let rec ty_find : ty -> ty -> bool =
   fun t1 -> function
          | TVar tv when (TVar tv) = t1 -> true
          | TFun (tx, ty) -> ty_find t1 tx || ty_find t1 ty
@@ -50,7 +50,7 @@ let rec ty_find :ty -> ty -> bool =
 ;;
 let rec ty_unify : ty_constraints -> ty_subst = function
   | [] -> []
-  | (s, t) :: xs when s = t -> ty_unify xs  
+  | (s, t) :: xs when s = t -> ty_unify xs
   | (TVar tv, t) :: xs | (t, TVar tv) :: xs ->
      let ty_const =
        if ty_find (TVar tv) t then
@@ -71,7 +71,7 @@ let rec ty_unify : ty_constraints -> ty_subst = function
   | (TList s, TList t) :: xs->
     ty_unify ((s, t) :: xs)
   | (TFun (s, t), TFun (s', t')) :: xs ->
-     ty_unify ((s, s') :: (t, t') :: xs) 
+     ty_unify ((s, s') :: (t, t') :: xs)
   | _ -> raise (Type_error __LOC__)
 ;;
 
@@ -90,11 +90,11 @@ let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
                 List.assoc name tenv
               with
               | Not_found -> raise (Type_error __LOC__)) in
-     (t, [])                                
+     (t, [])
   | EBin (op, e1, e2) ->
      begin
        match op with
-       | OpAdd | OpSub | OpMul | OpDiv -> 
+       | OpAdd | OpSub | OpMul | OpDiv ->
           let (t1, c1) = gather_ty_constraints tenv e1 in
           let (t2, c2) = gather_ty_constraints tenv e2 in
           (TInt, (t1, TInt) :: (t1, t2)::c1 @c2)
@@ -146,7 +146,7 @@ let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
      (t2, ((t1, beta) :: c1 @ c2))
   | EMatch (e1, pattern_list) ->
      let (t1, c1) = gather_ty_constraints tenv e1 in
-     let (pattern_c, ty_of_exp) = 
+     let (pattern_c, ty_of_exp) =
        List.fold_right (fun (p, e) (cli, etli) ->
            let (pt, pe, pc) =
              gather_ty_constraints_pattern p in
@@ -159,10 +159,10 @@ let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
        List.fold_right  (fun x xs -> (et1, x) :: xs)
          (List.tl ty_of_exp) [] in
      (et1, c1 @ exp_c @ pattern_c)
-     
+
   | _ -> raise (Type_error __LOC__)
-  
-    
+
+
 
 (* p1::p2 -> t1 = list t2 *)
 and  gather_ty_constraints_pattern : pattern -> ty * ty_env * ty_constraints =
@@ -195,7 +195,7 @@ let rec infer_expr : ty_env -> expr -> ty * ty_env =
   let t' = apply_ty_subst tysub' t in
   let tenv' = List.map (fun (name, t) -> (name, apply_ty_subst tysub' t)) tenv in
   (t', tenv')
-;;    
+;;
 let rec infer_cmd : ty_env -> command -> ty list  * ty_env =
   fun tenv cmd ->
   match cmd with
@@ -239,20 +239,20 @@ let rec infer_cmd : ty_env -> command -> ty list  * ty_env =
 
      let tysub = ty_unify c in
      let tenv_new = List.map (fun (x, ty) -> (x ,apply_ty_subst tysub ty))  (tenv'@tenv) in
-     let tys = List.map (fun (_, ty) -> apply_ty_subst tysub ty) tenv' in  
-     (tys, tenv_new)    
+     let tys = List.map (fun (_, ty) -> apply_ty_subst tysub ty) tenv' in
+     (tys, tenv_new)
 
-                 
+
     (* ist.map (fun x (ts, env) ->
       *       begin
       *         match x with
-      *         | (f, TFun (alpha, beta)) -> 
+      *         | (f, TFun (alpha, beta)) ->
       *            let t = apply_ty_subst tysub (TFun (alpha, beta)) in
       *            (t::ts, (f, t)::env)
       *         | _ -> (ts, env)
       *       end
-      *     ) tenv' ([], tenv) *)    
-        
+      *     ) tenv' ([], tenv) *)
+
   | CEnd -> raise End
-          
+
 ;;

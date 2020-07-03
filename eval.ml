@@ -84,7 +84,7 @@ let rec  eval : env -> expr -> value = fun env ->
         (* fold_right or mapi  *)
         let rec iter = fun n -> function
                              | ((f, x, e) :: xs) ->
-                                (f, VMRFun (n, funli, env)) :: (iter (n + 1) xs)
+                                (f, VMRFun (n, funli, oenv)) :: (iter (n + 1) xs)
                              | [] -> []
         in
         let (f, x, e) = List.nth funli (i - 1) in
