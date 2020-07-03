@@ -11,19 +11,6 @@ rule token = parse
 | space+      { token lexbuf }
 | "let"       { LET }
 | "in"        { IN  }
-| "="         { EQ }
-| "<"         { LT }
-| '+'         { PLUS }
-| '-'         { MINUS }
-| '*'         { TIMES }
-| '/'         { DIV }
-| '('         { LPAR }
-| ')'         { RPAR }
-| "["         { LBRA }
-| "]"         { RBRA }
-| ";"         { SEMI }
-| ","         { COMMA }
-| "::"        { CONS }
 | "if"        { IF   }
 | "then"      { THEN }
 | "else"      { ELSE }
@@ -33,11 +20,24 @@ rule token = parse
 | "->"        { RARROW }
 | ";;"        { EOC }
 | "match"     { MATCH }
-| "with"      { WITH  }
-| "end"       { END   }
-| "|"         { BAR }
-| "_"         { UNDERSCORE }
-| bool   as n { BOOL (bool_of_string n) }
+| "with"      { WITH }
+| "end"       { END }
+| "::"        { CONS }
+| '='         { EQ }
+| '<'         { LT }
+| '+'         { PLUS }
+| '-'         { MINUS }
+| '*'         { TIMES }
+| '/'         { DIV }
+| '('         { LPAR }
+| ')'         { RPAR }
+| '['         { LBRA }
+| ']'         { RBRA }
+| ';'         { SEMI }
+| ','         { COMMA }
+| '|'         { BAR }
+| '_'         { UNDERSCORE }
+| bool   as b { BOOL (bool_of_string b) }
 | digit+ as n { INT  (int_of_string n) }
 | ident  as n { ID n }
 | eof         { EOF  }

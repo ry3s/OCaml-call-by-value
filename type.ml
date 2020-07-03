@@ -15,6 +15,7 @@ type ty =
 type ty_subst =  (tvar * ty) list
 type ty_constraints = (ty * ty) list
 type ty_env = (name * ty) list
+type ty_scheme = tvar list * ty (* forall a1 ... an . t *)
 
 let new_ty_var  =
   let counter = ref 0 in
@@ -23,7 +24,7 @@ let new_ty_var  =
     counter := v + 1; v
   in
   body
-;;
+
 let rec apply_ty_subst : ty_subst -> ty -> ty =
   fun tysub t ->
   match t with
@@ -34,20 +35,20 @@ let rec apply_ty_subst : ty_subst -> ty -> ty =
   | TList t -> TList (apply_ty_subst tysub t)
   | TFun (tv1, tv2) -> TFun (apply_ty_subst tysub tv1, apply_ty_subst tysub tv2)
   | _-> t
-;;
+
 let compose_ty_subst : ty_subst -> ty_subst -> ty_subst =
   fun tysub1 tysub2 ->
   let tysub2' = List.map (fun (tv, t) -> (tv, apply_ty_subst tysub1 t)) tysub2 in
   let tysub1' = List.filter (fun (tv, t) ->  apply_ty_subst tysub2 (TVar tv) = TVar tv ) tysub1 in
   tysub1' @ tysub2'
-;;
+
 (* t2の中にt1と同じ型変数があればtrueを返す *)
 let rec ty_find : ty -> ty -> bool =
   fun t1 -> function
          | TVar tv when (TVar tv) = t1 -> true
          | TFun (tx, ty) -> ty_find t1 tx || ty_find t1 ty
          | _ -> false
-;;
+
 let rec ty_unify : ty_constraints -> ty_subst = function
   | [] -> []
   | (s, t) :: xs when s = t -> ty_unify xs
@@ -73,7 +74,7 @@ let rec ty_unify : ty_constraints -> ty_subst = function
   | (TFun (s, t), TFun (s', t')) :: xs ->
      ty_unify ((s, s') :: (t, t') :: xs)
   | _ -> raise (Type_error __LOC__)
-;;
+
 
 let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
   fun tenv exp ->
@@ -195,7 +196,7 @@ let rec infer_expr : ty_env -> expr -> ty * ty_env =
   let t' = apply_ty_subst tysub' t in
   let tenv' = List.map (fun (name, t) -> (name, apply_ty_subst tysub' t)) tenv in
   (t', tenv')
-;;
+
 let rec infer_cmd : ty_env -> command -> ty list  * ty_env =
   fun tenv cmd ->
   match cmd with
@@ -241,18 +242,4 @@ let rec infer_cmd : ty_env -> command -> ty list  * ty_env =
      let tenv_new = List.map (fun (x, ty) -> (x ,apply_ty_subst tysub ty))  (tenv'@tenv) in
      let tys = List.map (fun (_, ty) -> apply_ty_subst tysub ty) tenv' in
      (tys, tenv_new)
-
-
-    (* ist.map (fun x (ts, env) ->
-      *       begin
-      *         match x with
-      *         | (f, TFun (alpha, beta)) ->
-      *            let t = apply_ty_subst tysub (TFun (alpha, beta)) in
-      *            (t::ts, (f, t)::env)
-      *         | _ -> (ts, env)
-      *       end
-      *     ) tenv' ([], tenv) *)
-
   | CEnd -> raise End
-
-;;

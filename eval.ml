@@ -39,7 +39,7 @@ let rec find_match : pattern -> value -> env option = fun pattern value ->
   | _ -> None
   end
 
-let rec  eval : env -> expr -> value = fun env ->
+let rec eval : env -> expr -> value = fun env ->
   function
   | EValue v -> v
   | EVar x -> List.assoc x env
@@ -56,8 +56,7 @@ let rec  eval : env -> expr -> value = fun env ->
      | (OpLt , VBool b1, VBool b2) -> VBool (b1 < b2)
      | _ -> raise (Eval_error __LOC__)
      end
-  | ETuple tuple_li -> VTuple (List.map (fun x -> eval env x) tuple_li)
-
+  | ETuple es -> VTuple (List.map (fun x -> eval env x) es)
   | ENil -> VNil
   | ECons (e1, e2) -> let v1 = eval env e1 in
                       let v2 = eval env e2 in
@@ -66,7 +65,7 @@ let rec  eval : env -> expr -> value = fun env ->
      let v1 = eval env e1 in
      let env' = find_match pattern v1 in
      begin match env' with
-     | Some newenv -> eval (newenv@env) e2
+     | Some newenv -> eval (newenv @ env) e2
      | None -> raise (Eval_error __LOC__)
      end
   | ERLet (f, x, e1, e2) -> let env' = (f, VRFun (f, x, e1, env))::env in
@@ -80,27 +79,21 @@ let rec  eval : env -> expr -> value = fun env ->
      | VRFun (f, x, e, oenv) ->
         let env' = (x, v2)::(f, VRFun (f, x, e,oenv))::oenv in
         eval env' e
-     | VMRFun (i, funli, oenv) ->
-        (* fold_right or mapi  *)
-        let rec iter = fun n -> function
-                             | ((f, x, e) :: xs) ->
-                                (f, VMRFun (n, funli, oenv)) :: (iter (n + 1) xs)
-                             | [] -> []
+     | VMRFun (i, fs, oenv) ->
+        let (f, x, e) = List.nth fs (i - 1) in
+        let env' = List.mapi (fun i (f, x, e) ->
+                       (f, VMRFun (i + 1, fs, oenv))
+                     ) fs
         in
-        let (f, x, e) = List.nth funli (i - 1) in
-        let env' = (x, v2) :: (iter 1 funli) @ oenv in
-        eval env' e
+        eval ((x, v2) :: env' @ oenv) e
      | _ -> raise (Eval_error  __LOC__)
      end
-
   | EIf (e1, e2, e3) ->
      begin match eval env e1 with
      | VBool true -> eval env e2
      | VBool false -> eval env e3
      | _ -> raise (Eval_error __LOC__)
      end
-
-
   | EMatch (e1, pattern_list) ->
      let v1 = eval env e1 in
      let rec check : value -> (pattern * expr) list -> value =

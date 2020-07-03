@@ -34,3 +34,5 @@ _opam/
 main
 ._bcdi/*
 ._d/*
+parser.automaton
+parser.conflicts
