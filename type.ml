@@ -80,11 +80,10 @@ let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
   fun tenv exp ->
   match exp with
   | EValue v ->
-     begin
-       match v with
-       | VInt n -> (TInt, [])
-       | VBool b -> (TBool, [])
-       | _ -> raise (Type_error __LOC__)
+     begin match v with
+     | VInt n -> (TInt, [])
+     | VBool b -> (TBool, [])
+     | _ -> raise (Type_error __LOC__)
      end
   | EVar name ->
      let t = (try
@@ -93,16 +92,15 @@ let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
               | Not_found -> raise (Type_error __LOC__)) in
      (t, [])
   | EBin (op, e1, e2) ->
-     begin
-       match op with
-       | OpAdd | OpSub | OpMul | OpDiv ->
-          let (t1, c1) = gather_ty_constraints tenv e1 in
-          let (t2, c2) = gather_ty_constraints tenv e2 in
-          (TInt, (t1, TInt) :: (t1, t2)::c1 @c2)
-       | OpEq | OpLt ->
-          let (t1, c1) = gather_ty_constraints tenv e1 in
-          let (t2, c2) = gather_ty_constraints tenv e2 in
-          (TBool, (t1, t2)::c1 @c2)
+     begin match op with
+     | OpAdd | OpSub | OpMul | OpDiv ->
+        let (t1, c1) = gather_ty_constraints tenv e1 in
+        let (t2, c2) = gather_ty_constraints tenv e2 in
+        (TInt, (t1, TInt) :: (t1, t2)::c1 @c2)
+     | OpEq | OpLt ->
+        let (t1, c1) = gather_ty_constraints tenv e1 in
+        let (t2, c2) = gather_ty_constraints tenv e2 in
+        (TBool, (t1, t2)::c1 @c2)
      end
   | ETuple tuple_li ->
      let t_c_pair =
@@ -118,8 +116,7 @@ let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
      (t2, (TList t1, t2) :: c1 @ c2)
   | ELet (p, e1, e2) ->
      (* let x = (match p with PVar name -> name | _ -> raise (Type_error __LOC__)) in *)
-     let (pt, pe, pc) =
-       gather_ty_constraints_pattern p in
+     let (pt, pe, pc) = gather_ty_constraints_pattern p in
      let (t1, c1) = gather_ty_constraints tenv e1 in
      let (t2, c2) = gather_ty_constraints (pe @ tenv) e2 in
      (t2, (pt, t1) :: pc @ c1 @ c2)
@@ -160,11 +157,23 @@ let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
        List.fold_right  (fun x xs -> (et1, x) :: xs)
          (List.tl ty_of_exp) [] in
      (et1, c1 @ exp_c @ pattern_c)
-
-  | _ -> raise (Type_error __LOC__)
-
-
-
+  | EMRLet (fs, e) ->
+     let tenv' = List.fold_right (fun (f, x, e) env ->
+                     let alpha = TVar (new_ty_var ()) in
+                     let beta = TVar (new_ty_var ()) in
+                     (f, TFun (alpha, beta)) :: env
+                   ) fs [] in
+     let constr1 = List.fold_right (fun (f, x, e) constr ->
+                      let (a, b) = begin match List.assoc_opt f tenv' with
+                                   | Some(TFun (alpha, beta)) -> (alpha, beta)
+                                   | _ -> raise (Type_error __LOC__)
+                                   end
+                      in
+                      let (t1, c1) = gather_ty_constraints ((x, a) :: tenv' @ tenv) e in
+                      (b, t1) :: c1 @ constr
+                     ) fs [] in
+     let (t, constr2) = gather_ty_constraints (tenv' @ tenv) e in
+     (t, constr1 @ constr2)
 (* p1::p2 -> t1 = list t2 *)
 and  gather_ty_constraints_pattern : pattern -> ty * ty_env * ty_constraints =
   fun pattern ->
@@ -229,13 +238,12 @@ let rec infer_cmd : ty_env -> command -> ty list  * ty_env =
      let  c  =
        List.fold_right  (fun (f, x, e)  c->
            let (a, b) =
-             begin
-               match  List.assoc f tenv' with
+             begin match  List.assoc f tenv' with
                | TFun (alpha, beta) -> (alpha, beta)
              end
-                 in
+           in
            let (t1, c1) = gather_ty_constraints ((x, a)::tenv'@tenv) e in
-           (b, t1)::c1 @ c
+           (b, t1) :: c1 @ c
          ) funlist [] in
 
      let tysub = ty_unify c in

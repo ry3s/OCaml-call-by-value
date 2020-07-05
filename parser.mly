@@ -52,13 +52,14 @@ argument_expr:
   | var EQ expr            { EFun ($1, $3) }
 ;
 expr:
-  | LET pattern_expr EQ expr IN expr  { ELet ($2, $4, $6) }
-  | FUN var RARROW expr               { EFun ($2, $4) }
-  | LET REC var var EQ expr IN expr   { ERLet ($3, $4, $6, $8) }
-  | LET REC var var argument_expr IN expr   { ERLet ($3, $4, $5, $7) }
-  | IF expr THEN expr ELSE expr       { EIf ($2, $4, $6) }
-  | MATCH expr WITH branch_expr END   { EMatch ($2, $4) }
-  | compare_expr                      { $1 }
+  | LET pattern_expr EQ expr IN expr                   { ELet ($2, $4, $6) }
+  | FUN var RARROW expr                                { EFun ($2, $4) }
+  | LET REC var var EQ expr IN expr                    { ERLet ($3, $4, $6, $8) }
+  | LET REC var var argument_expr IN expr              { ERLet ($3, $4, $5, $7) }
+  | LET REC var var EQ expr AND mutualrec_expr IN expr { EMRLet (($3, $4, $6) :: $8, $10) }
+  | IF expr THEN expr ELSE expr                        { EIf ($2, $4, $6) }
+  | MATCH expr WITH branch_expr END                    { EMatch ($2, $4) }
+  | compare_expr                                       { $1 }
 ;
 branch_expr:
   | cons_pattern_expr RARROW expr BAR branch_expr { ($1, $3) :: $5 }
@@ -78,7 +79,6 @@ pattern_expr:
   | LPAR tuple_pattern_expr RPAR   { PTuple $2 }
   | LBRA RBRA                      { PNil }
   | LBRA list_pattern_expr RBRA    { $2 }
-/*  | cons_pattern_expr              { $1 } */
   | LPAR pattern_expr RPAR         { $2 }
 ;
 

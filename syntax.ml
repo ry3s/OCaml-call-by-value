@@ -17,7 +17,7 @@ and expr = EVar   of name
          | EFun   of name * expr
          | EApp   of expr * expr
          | ERLet  of name * name * expr * expr
-         (* | EMRLet of (name * name * expr ) list * expr *)
+         | EMRLet of (name * name * expr) list * expr
          | EMatch of expr * (pattern * expr) list
 
 and value = VInt  of int

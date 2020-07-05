@@ -111,7 +111,14 @@ let rec eval : env -> expr -> value = fun env ->
        | [] -> raise (Eval_error __LOC__)
        end
      in
-     check v1 pattern_list;;
+     check v1 pattern_list
+  | EMRLet (fs, e1) ->
+     let env' = List.mapi (fun i (f, x, e) ->
+                    (f, VMRFun (i + 1, fs, env))
+                  ) fs
+     in
+     let newenv = env' @ env in
+     eval (newenv @ env) e1
 
 let execute_cmd : env -> command  -> env * value =
   fun env value ->
@@ -124,7 +131,7 @@ let execute_cmd : env -> command  -> env * value =
      | Some newenv -> (newenv @ env, v)
      | None -> raise (Eval_error __LOC__)
      end
-  | CRLet (f, x, e) -> ((f, VRFun (f, x, e, env))::env, VRFun (f, x, e, env))
+  | CRLet (f, x, e) -> ((f, VRFun (f, x, e, env)) :: env, VRFun (f, x, e, env))
   | CMRLet fs ->
      let env' = List.mapi (fun i (f, x, e) ->
                     (f, VMRFun (i + 1, fs, env))
