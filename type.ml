@@ -16,15 +16,12 @@ type ty_constraints = (ty * ty) list
 type ty_scheme = tvar list * ty (* forall a1 ... an . t *)
 type ty_env = (name * ty_scheme) list
 
-(* type ty_assumption = (name * ty_scheme) list *)
-
 let union : 'a list -> 'a list -> 'a list = fun xs ys ->
   List.fold_left (fun acc x -> if List.mem x ys then acc else (x :: acc)) ys xs
 
 let diff : 'a list -> 'a list -> 'a list = fun xs ys ->
   List.fold_left (fun acc x -> if List.mem x ys then acc else (x :: acc)) [] xs
 
-(* t2 の中に t1 と同じ型変数があれば true を返す *)
 let rec occur : ty -> ty -> bool = fun ty ->
   function
   | TVar tv when (TVar tv) = ty -> true
@@ -41,27 +38,28 @@ let rec free_vars : ty -> tvar list = function
 let free_vars_in_ty_scheme : ty_scheme -> tvar list = fun (vs, ty) ->
   diff (free_vars ty) vs
 
-let new_ty_var () =
+let new_ty_var =
   let counter = ref 0 in
   let body () =
     let v = !counter in
     counter := v + 1; v
   in
-  body ()
+  body
 
 let rec apply_ty_subst : ty_subst -> ty -> ty = fun tysub ty ->
   match ty with
-  | TVar tv -> (try List.assoc tv tysub with
-                | Not_found -> TVar tv)
-  | TTuple t ->
-     TTuple (List.map (fun x -> apply_ty_subst tysub x) t)
+  | TVar tv -> begin match List.assoc_opt tv tysub with
+               | Some t -> t
+               | None -> TVar tv
+               end
+  | TTuple t -> TTuple (List.map (fun x -> apply_ty_subst tysub x) t)
   | TList t -> TList (apply_ty_subst tysub t)
   | TFun (tv1, tv2) -> TFun (apply_ty_subst tysub tv1, apply_ty_subst tysub tv2)
   | _ -> ty
 
 let compose_ty_subst : ty_subst -> ty_subst -> ty_subst = fun tysub1 tysub2 ->
   let tysub2' = List.map (fun (tv, t) -> (tv, apply_ty_subst tysub1 t)) tysub2 in
-  let tysub1' = List.filter (fun (tv, t) ->  apply_ty_subst tysub2 (TVar tv) = TVar tv ) tysub1 in
+  let tysub1' = List.filter (fun (tv, t) ->  apply_ty_subst tysub2 (TVar tv) = TVar tv) tysub1 in
   tysub1' @ tysub2'
 
 let apply_ty_subst_to_env : ty_subst -> ty_env -> ty_env = fun subst env ->
@@ -81,32 +79,25 @@ let instantiate : ty_scheme -> ty = fun (vs, ty) ->
 
 let rec ty_unify : ty_constraints -> ty_subst = function
   | [] -> []
-  | (s, t) :: cs when s = t -> ty_unify cs
+  | (t, s) :: cs when t = s -> ty_unify cs
   | (TVar tv, t) :: cs | (t, TVar tv) :: cs ->
-     let ty_const = if occur (TVar tv) t then raise (Type_error __LOC__)
-                    else
-                      List.map (fun (x, y) ->
-                          (apply_ty_subst [(tv, t)] x, apply_ty_subst [(tv, t)] y)) cs
-     in
-     compose_ty_subst (ty_unify ty_const) [(tv, t)]
+     if occur (TVar tv) t then raise (Type_error __LOC__)
+     else
+       let constr = List.map (fun (x, y) ->
+                        (apply_ty_subst [(tv, t)] x, apply_ty_subst [(tv, t)] y)) cs
+       in
+       compose_ty_subst [(tv, t)] (ty_unify constr)
   | (TTuple s, TTuple t) :: cs ->
-     let constr =
-       (try
-          List.fold_right2 (fun  x y acc -> (x, y) :: acc) s t []
-        with
-        | Invalid_argument _ -> raise (Type_error __LOC__))
-     in
-     compose_ty_subst  (ty_unify constr) (ty_unify cs)
-  | (TList s, TList t) :: cs ->
-     ty_unify ((s, t) :: cs)
-  | (TFun (s, t), TFun (s', t')) :: cs ->
-     ty_unify ((s, s') :: (t, t') :: cs)
+     if List.length s <> List.length t then raise (Type_error __LOC__)
+     else
+       let constr = List.fold_right2 (fun  x y acc -> (x, y) :: acc) s t [] in
+       compose_ty_subst (ty_unify constr) (ty_unify cs)
+  | (TList s, TList t) :: cs -> ty_unify ((s, t) :: cs)
+  | (TFun (s, t), TFun (s', t')) :: cs -> ty_unify ((s, s') :: (t, t') :: cs)
   | _ -> raise (Type_error __LOC__)
 
-
-let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
-  fun tenv exp ->
-  match exp with
+let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints = fun tenv ->
+  function
   | EValue v ->
      begin match v with
      | VInt n -> (TInt, [])
@@ -129,12 +120,11 @@ let rec gather_ty_constraints : ty_env -> expr ->  ty * ty_constraints =
         let (t2, c2) = gather_ty_constraints tenv e2 in
         (TBool, (t1, t2)::c1 @c2)
      end
-  | ETuple tuple_li ->
-     let t_c_pair =
-       List.map (fun x -> gather_ty_constraints tenv x) tuple_li in
-     let (t1, c1) =
-       List.fold_right (fun  (t, c) (tli, cli) ->
-           (t::tli, c @ cli))  t_c_pair ([], []) in
+  | ETuple exps ->
+     let t_c_pair = List.map (fun x -> gather_ty_constraints tenv x) exps in
+     let (t1, c1) = List.fold_right (fun  (t, c) (ts, cs) ->
+                        (t :: ts, c @ cs)
+                      )  t_c_pair ([], []) in
      (TTuple t1, c1)
   | ENil -> (TList (TVar (new_ty_var ())), [])
   | ECons (e1, e2) ->
@@ -242,7 +232,8 @@ let rec infer_expr : ty_env -> expr -> ty * ty_env = fun tenv exp ->
   (* let tenv' = List.map (fun (name, t) -> (name, apply_ty_subst tysub' t)) tenv in *)
   (t', tenv)
 
-let rec infer_cmd : ty_env -> command -> ty list  * ty_env = fun tenv -> function
+let rec infer_cmd : ty_env -> command -> ty list  * ty_env = fun tenv ->
+  function
   | CExp exp ->
      let (t, env) = infer_expr tenv exp in
      ([t], env)
@@ -254,9 +245,10 @@ let rec infer_cmd : ty_env -> command -> ty list  * ty_env = fun tenv -> functio
      in
      let (t1, c1) = gather_ty_constraints tenv exp in
      let subst = ty_unify c1 in
+     let t1' = apply_ty_subst subst t1 in
      let ts = generalize (apply_ty_subst_to_env subst tenv) (apply_ty_subst subst t1) in
      let tenv' = (n, ts) :: tenv in
-     ([t1], tenv')
+     ([t1'], tenv')
      (* let (pt, pe, pc) = gather_ty_constraints_pattern pattern in
       * let (t1, c1) = gather_ty_constraints tenv e1 in
       * let tysub' = ty_unify ((pt, t1) :: pc @ c1) in
